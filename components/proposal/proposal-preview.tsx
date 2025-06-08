@@ -1,8 +1,45 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Download, Copy, Edit } from "lucide-react"
+import { useState } from "react"
 
-export default function ProposalPreview() {
+interface ProposalPreviewProps {
+  proposal: string
+}
+
+export default function ProposalPreview({ proposal }: ProposalPreviewProps) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(proposal)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy text: ", err)
+    }
+  }
+
+  const handleDownload = () => {
+    const element = document.createElement("a")
+    const file = new Blob([proposal], { type: "text/plain" })
+    element.href = URL.createObjectURL(file)
+    element.download = "proposal.txt"
+    document.body.appendChild(element)
+    element.click()
+    document.body.removeChild(element)
+  }
+
+  if (!proposal) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p className="text-gray-500">No proposal generated yet</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -12,11 +49,11 @@ export default function ProposalPreview() {
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={handleCopy}>
             <Copy className="h-4 w-4 mr-2" />
-            Copy
+            {copied ? "Copied!" : "Copy"}
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={handleDownload}>
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
@@ -25,73 +62,7 @@ export default function ProposalPreview() {
 
       <Card>
         <CardContent className="p-6">
-          <div className="prose max-w-none">
-            <h3>Custom WooCommerce Solution for Your Boutique Fashion Store</h3>
-
-            <p>
-              <strong>
-                As a WordPress developer with over 7 years of experience specializing in WooCommerce and custom theme
-                development
-              </strong>
-              , I'm excited about the opportunity to create a stunning online presence for your boutique clothing store.
-            </p>
-
-            <p>
-              Your requirement for a developer with <strong>5+ years of WordPress experience</strong> and a{" "}
-              <strong>proven track record with WooCommerce</strong> aligns perfectly with my expertise. I've
-              successfully delivered <strong>15+ e-commerce projects</strong> for fashion retailers, focusing on
-              beautiful design, intuitive shopping experiences, and robust backend systems.
-            </p>
-
-            <h4>Technical Approach:</h4>
-
-            <ol>
-              <li>
-                <strong>Custom Theme Development:</strong> I'll create a bespoke WordPress theme that perfectly captures
-                your boutique's unique aesthetic, ensuring your online presence stands out from template-based
-                competitors.
-              </li>
-              <li>
-                <strong>WooCommerce Integration:</strong> Full implementation of WooCommerce with custom product
-                displays, size guides, and product filtering optimized for fashion retail.
-              </li>
-              <li>
-                <strong>Mobile-First Responsive Design:</strong> Your store will provide a seamless shopping experience
-                across all devices, with special attention to mobile checkout optimization.
-              </li>
-              <li>
-                <strong>Elementor Pro:</strong> I'll leverage Elementor's capabilities for easy content management while
-                extending it with custom code where needed for unique functionality.
-              </li>
-            </ol>
-
-            <h4>Project Timeline:</h4>
-
-            <ul>
-              <li>Discovery & Design: 1 week</li>
-              <li>Development & WooCommerce Setup: 2 weeks</li>
-              <li>Testing & Refinement: 1 week</li>
-              <li>
-                Total: <strong>4 weeks</strong> to launch
-              </li>
-            </ul>
-
-            <p>
-              I've recently completed a similar project for Modish Boutique, a women's clothing store, where we
-              increased their online sales by 45% within three months of launch through an intuitive shopping experience
-              and optimized mobile checkout process.
-            </p>
-
-            <p>
-              I'd be happy to discuss your project in more detail and share my portfolio featuring similar fashion
-              e-commerce sites I've developed. When would be a good time for a quick call this week?
-            </p>
-
-            <p>
-              Looking forward to the possibility of creating an exceptional online shopping experience for your
-              boutique.
-            </p>
-          </div>
+          <div className="prose max-w-none whitespace-pre-wrap">{proposal}</div>
         </CardContent>
       </Card>
     </div>

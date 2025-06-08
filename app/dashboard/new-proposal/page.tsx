@@ -11,33 +11,87 @@ import { Loader2, Sparkles } from "lucide-react"
 import JobDescriptionAnalysis from "@/components/proposal/job-description-analysis"
 import ProposalPreview from "@/components/proposal/proposal-preview"
 
+interface JobAnalysis {
+  requirements: string[]
+  metrics: string[]
+  strongWords: string[]
+  industry: string
+  businessType: string
+}
+
 export default function NewProposal() {
+  const [jobTitle, setJobTitle] = useState("")
   const [jobDescription, setJobDescription] = useState("")
+  const [customInstructions, setCustomInstructions] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isAnalyzed, setIsAnalyzed] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGenerated, setIsGenerated] = useState(false)
+  const [analysis, setAnalysis] = useState<JobAnalysis | null>(null)
+  const [generatedProposal, setGeneratedProposal] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!jobDescription.trim()) return
 
     setIsAnalyzing(true)
+    setError(null)
 
-    // Simulate analysis
-    setTimeout(() => {
-      setIsAnalyzing(false)
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ jobDescription }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze job description")
+      }
+
+      const analysisData = await response.json()
+      setAnalysis(analysisData)
       setIsAnalyzed(true)
-    }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
-  const handleGenerate = () => {
-    setIsGenerating(true)
+  const handleGenerate = async () => {
+    if (!analysis) return
 
-    // Simulate generation
-    setTimeout(() => {
-      setIsGenerating(false)
+    setIsGenerating(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobDescription,
+          analysis,
+          customInstructions,
+          jobTitle,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate proposal")
+      }
+
+      const { proposal } = await response.json()
+      setGeneratedProposal(proposal)
       setIsGenerated(true)
-    }, 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   return (
@@ -48,6 +102,12 @@ export default function NewProposal() {
           <p className="text-gray-500">Generate a tailored proposal based on job description</p>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
@@ -60,7 +120,12 @@ export default function NewProposal() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="job-title">Job Title</Label>
-                  <Input id="job-title" placeholder="E.g., WordPress Developer" />
+                  <Input
+                    id="job-title"
+                    placeholder="E.g., WordPress Developer"
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -99,6 +164,8 @@ export default function NewProposal() {
                   <Textarea
                     placeholder="E.g., Focus on my WordPress experience, mention my portfolio site, keep it under 300 words..."
                     className="min-h-[100px]"
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
                   />
 
                   <Button onClick={handleGenerate} disabled={isGenerating} className="w-full">
@@ -137,11 +204,11 @@ export default function NewProposal() {
               </TabsList>
 
               <TabsContent value="analysis">
-                <JobDescriptionAnalysis />
+                <JobDescriptionAnalysis analysis={analysis} />
               </TabsContent>
 
               <TabsContent value="proposal">
-                <ProposalPreview />
+                <ProposalPreview proposal={generatedProposal} />
               </TabsContent>
             </Tabs>
           )}

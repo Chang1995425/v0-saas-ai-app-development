@@ -1,56 +1,47 @@
 import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
-import { createServerSupabase } from "@/lib/supabase"
 
 export async function POST(req: Request) {
   try {
-    const { jobDescription, analysis, customInstructions, userId } = await req.json()
+    const { jobDescription, analysis, customInstructions, jobTitle } = await req.json()
 
     if (!jobDescription || jobDescription.trim() === "") {
       return NextResponse.json({ error: "Job description is required" }, { status: 400 })
     }
 
-    // Get user's past proposals to learn their style
-    const supabase = createServerSupabase()
-    const { data: userDocuments } = await supabase.from("documents").select("fileUrl").eq("userId", userId).limit(3)
-
-    // Get user's general instructions
-    const { data: userSettings } = await supabase
-      .from("user_settings")
-      .select("generalInstructions")
-      .eq("userId", userId)
-      .single()
-
-    const generalInstructions = userSettings?.generalInstructions || ""
-
     // Generate the proposal
     const { text } = await generateText({
       model: openai("gpt-4o"),
       prompt: `
-        You are an expert proposal writer. Create a compelling proposal for the following job description.
+        You are an expert proposal writer. Create a compelling proposal for the following job posting.
+        
+        Job Title: ${jobTitle || "Not specified"}
         
         Job Description:
         ${jobDescription}
         
-        Analysis:
-        ${JSON.stringify(analysis)}
+        Analysis Results:
+        - Requirements: ${analysis.requirements.join(", ")}
+        - Key Metrics: ${analysis.metrics.join(", ")}
+        - Strong Words: ${analysis.strongWords.join(", ")}
+        - Industry: ${analysis.industry}
+        - Business Type: ${analysis.businessType}
         
-        General Instructions (apply to all proposals):
-        ${generalInstructions}
-        
-        Custom Instructions (specific to this proposal):
-        ${customInstructions || ""}
+        Custom Instructions:
+        ${customInstructions || "None"}
         
         Create a professional proposal that:
-        1. Starts with a strong opening sentence that includes key requirements and metrics
+        1. Starts with a strong opening sentence that includes key requirements and metrics from the analysis
         2. Addresses the client's specific needs and requirements
         3. Includes a technical approach section explaining how you'll implement the solution
-        4. Provides a clear timeline
+        4. Provides a clear timeline and deliverables
         5. Mentions relevant past experience or examples
         6. Ends with a call to action
+        7. Uses the strong words and metrics identified in the analysis naturally throughout
+        8. Shows understanding of their industry and business type
         
-        Format the proposal with proper headings, paragraphs, and bullet points for readability.
+        Keep the proposal professional, concise, and compelling. Format it with proper paragraphs and structure.
       `,
     })
 
