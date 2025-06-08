@@ -1,9 +1,22 @@
-import { createServerSupabase } from "@/lib/supabase"
+import { createClientSupabase } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = createServerSupabase()
+    // Get the authorization header from the request
+    const authHeader = request.headers.get("Authorization")
+
+    if (!authHeader) {
+      return NextResponse.json({ error: "No authorization header" }, { status: 401 })
+    }
+
+    const supabase = createClientSupabase()
+
+    // Set the auth header for this request
+    supabase.auth.setSession({
+      access_token: authHeader.replace("Bearer ", ""),
+      refresh_token: "",
+    })
 
     const {
       data: { user },
@@ -17,6 +30,25 @@ export async function GET() {
     const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
     if (error && error.code !== "PGRST116") {
+      // If no profile exists, create one
+      if (error.code === "PGRST116") {
+        const { data: newProfile, error: insertError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || "",
+            general_instructions: "",
+          })
+          .select()
+          .single()
+
+        if (insertError) {
+          throw insertError
+        }
+
+        return NextResponse.json(newProfile)
+      }
       throw error
     }
 
@@ -47,9 +79,21 @@ export async function GET() {
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(request: Request) {
   try {
-    const supabase = createServerSupabase()
+    const authHeader = request.headers.get("Authorization")
+
+    if (!authHeader) {
+      return NextResponse.json({ error: "No authorization header" }, { status: 401 })
+    }
+
+    const supabase = createClientSupabase()
+
+    // Set the auth header for this request
+    supabase.auth.setSession({
+      access_token: authHeader.replace("Bearer ", ""),
+      refresh_token: "",
+    })
 
     const {
       data: { user },
@@ -60,7 +104,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { name, general_instructions } = await req.json()
+    const { name, general_instructions } = await request.json()
 
     const { data: profile, error } = await supabase
       .from("profiles")

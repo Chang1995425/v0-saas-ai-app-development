@@ -11,6 +11,7 @@ import { FileText, Clock, Loader2, Save } from "lucide-react"
 import Link from "next/link"
 import RecentProposals from "@/components/dashboard/recent-proposals"
 import UploadDocuments from "@/components/dashboard/upload-documents"
+import { makeAuthenticatedRequest } from "@/lib/api-client"
 
 interface Profile {
   id: string
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
   const [generalInstructions, setGeneralInstructions] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProfile()
@@ -32,15 +34,21 @@ export default function Dashboard() {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch("/api/profile")
+      setError(null)
+      const response = await makeAuthenticatedRequest("/api/profile")
+
       if (response.ok) {
         const profileData = await response.json()
         setProfile(profileData)
         setName(profileData.name || "")
         setGeneralInstructions(profileData.general_instructions || "")
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to fetch profile")
       }
     } catch (error) {
       console.error("Error fetching profile:", error)
+      setError("Failed to fetch profile")
     } finally {
       setLoading(false)
     }
@@ -48,12 +56,11 @@ export default function Dashboard() {
 
   const handleSaveProfile = async () => {
     setSaving(true)
+    setError(null)
+
     try {
-      const response = await fetch("/api/profile", {
+      const response = await makeAuthenticatedRequest("/api/profile", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           name,
           general_instructions: generalInstructions,
@@ -63,10 +70,13 @@ export default function Dashboard() {
       if (response.ok) {
         const updatedProfile = await response.json()
         setProfile(updatedProfile)
-        // You could add a toast notification here
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to save profile")
       }
     } catch (error) {
       console.error("Error saving profile:", error)
+      setError("Failed to save profile")
     } finally {
       setSaving(false)
     }
@@ -85,6 +95,12 @@ export default function Dashboard() {
           </Link>
         </Button>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
 
       <Tabs defaultValue="proposals" className="space-y-4">
         <TabsList>

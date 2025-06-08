@@ -7,9 +7,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles, AlertCircle } from "lucide-react"
 import JobDescriptionAnalysis from "@/components/proposal/job-description-analysis"
 import ProposalPreview from "@/components/proposal/proposal-preview"
+import { makeAuthenticatedRequest } from "@/lib/api-client"
 
 interface JobAnalysis {
   requirements: string[]
@@ -46,15 +47,17 @@ export default function NewProposal() {
         body: JSON.stringify({ jobDescription }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("Failed to analyze job description")
+        throw new Error(data.error || "Failed to analyze job description")
       }
 
-      const analysisData = await response.json()
-      setAnalysis(analysisData)
+      setAnalysis(data)
       setIsAnalyzed(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(err instanceof Error ? err.message : "An error occurred analyzing the job description")
+      console.error("Analysis error:", err)
     } finally {
       setIsAnalyzing(false)
     }
@@ -67,11 +70,8 @@ export default function NewProposal() {
     setError(null)
 
     try {
-      const response = await fetch("/api/generate", {
+      const response = await makeAuthenticatedRequest("/api/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           jobDescription,
           analysis,
@@ -80,15 +80,17 @@ export default function NewProposal() {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("Failed to generate proposal")
+        throw new Error(data.error || "Failed to generate proposal")
       }
 
-      const { proposal } = await response.json()
-      setGeneratedProposal(proposal)
+      setGeneratedProposal(data.proposal)
       setIsGenerated(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(err instanceof Error ? err.message : "An error occurred generating the proposal")
+      console.error("Generation error:", err)
     } finally {
       setIsGenerating(false)
     }
@@ -104,7 +106,8 @@ export default function NewProposal() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
           <p className="text-red-600">{error}</p>
         </div>
       )}

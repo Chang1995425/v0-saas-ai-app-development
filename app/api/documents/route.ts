@@ -1,9 +1,21 @@
-import { createServerSupabase } from "@/lib/supabase"
+import { createClientSupabase } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = createServerSupabase()
+    const authHeader = request.headers.get("Authorization")
+
+    if (!authHeader) {
+      return NextResponse.json({ error: "No authorization header" }, { status: 401 })
+    }
+
+    const supabase = createClientSupabase()
+
+    // Set the auth header for this request
+    supabase.auth.setSession({
+      access_token: authHeader.replace("Bearer ", ""),
+      refresh_token: "",
+    })
 
     const {
       data: { user },
@@ -31,9 +43,21 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const supabase = createServerSupabase()
+    const authHeader = request.headers.get("Authorization")
+
+    if (!authHeader) {
+      return NextResponse.json({ error: "No authorization header" }, { status: 401 })
+    }
+
+    const supabase = createClientSupabase()
+
+    // Set the auth header for this request
+    supabase.auth.setSession({
+      access_token: authHeader.replace("Bearer ", ""),
+      refresh_token: "",
+    })
 
     const {
       data: { user },
@@ -44,11 +68,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const formData = await req.formData()
+    const formData = await request.formData()
     const file = formData.get("file") as File
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+    ]
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: "File type not supported. Please upload PDF, DOCX, or TXT files." },
+        { status: 400 },
+      )
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "File size too large. Maximum size is 10MB." }, { status: 400 })
     }
 
     // Upload file to Supabase Storage
@@ -58,7 +100,8 @@ export async function POST(req: Request) {
     const { data: uploadData, error: uploadError } = await supabase.storage.from("documents").upload(fileName, file)
 
     if (uploadError) {
-      throw uploadError
+      console.error("Upload error:", uploadError)
+      return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 })
     }
 
     // Get public URL
@@ -80,7 +123,8 @@ export async function POST(req: Request) {
       .single()
 
     if (dbError) {
-      throw dbError
+      console.error("Database error:", dbError)
+      return NextResponse.json({ error: "Failed to save document record" }, { status: 500 })
     }
 
     return NextResponse.json(document)
@@ -90,9 +134,21 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(request: Request) {
   try {
-    const supabase = createServerSupabase()
+    const authHeader = request.headers.get("Authorization")
+
+    if (!authHeader) {
+      return NextResponse.json({ error: "No authorization header" }, { status: 401 })
+    }
+
+    const supabase = createClientSupabase()
+
+    // Set the auth header for this request
+    supabase.auth.setSession({
+      access_token: authHeader.replace("Bearer ", ""),
+      refresh_token: "",
+    })
 
     const {
       data: { user },
@@ -103,7 +159,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { searchParams } = new URL(req.url)
+    const { searchParams } = new URL(request.url)
     const documentId = searchParams.get("id")
 
     if (!documentId) {

@@ -4,9 +4,8 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Upload, File, X, Check, Loader2 } from "lucide-react"
-
-type UploadStatus = "idle" | "uploading" | "success" | "error"
+import { Upload, File, X, Check, Loader2, AlertCircle } from "lucide-react"
+import { makeAuthenticatedRequest } from "@/lib/api-client"
 
 interface Document {
   id: string
@@ -18,9 +17,10 @@ interface Document {
 
 export default function UploadDocuments() {
   const [documents, setDocuments] = useState<Document[]>([])
-  const [uploadingFiles, setUploadingFiles] = useState<Map<string, number>>(new Map())
+  const [uploadingFiles, setUploadingFiles] = useState<Map<string, boolean>>(new Map())
   const [isDragging, setIsDragging] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDocuments()
@@ -28,13 +28,19 @@ export default function UploadDocuments() {
 
   const fetchDocuments = async () => {
     try {
-      const response = await fetch("/api/documents")
+      setError(null)
+      const response = await makeAuthenticatedRequest("/api/documents")
+
       if (response.ok) {
         const docs = await response.json()
         setDocuments(docs)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to fetch documents")
       }
     } catch (error) {
       console.error("Error fetching documents:", error)
+      setError("Failed to fetch documents")
     } finally {
       setLoading(false)
     }
@@ -68,20 +74,39 @@ export default function UploadDocuments() {
     for (const file of files) {
       const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
+      // Validate file type
+      const allowedTypes = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+      ]
+      if (!allowedTypes.includes(file.type)) {
+        setError(`File "${file.name}" is not supported. Please upload PDF, DOCX, or TXT files.`)
+        continue
+      }
+
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`File "${file.name}" is too large. Maximum size is 10MB.`)
+        continue
+      }
+
       // Add to uploading files
-      setUploadingFiles((prev) => new Map(prev.set(fileId, 0)))
+      setUploadingFiles((prev) => new Map(prev.set(fileId, true)))
+      setError(null)
 
       try {
         const formData = new FormData()
         formData.append("file", file)
 
-        const response = await fetch("/api/documents", {
+        const response = await makeAuthenticatedRequest("/api/documents", {
           method: "POST",
           body: formData,
         })
 
         if (!response.ok) {
-          throw new Error("Upload failed")
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Upload failed")
         }
 
         const newDocument = await response.json()
@@ -97,6 +122,7 @@ export default function UploadDocuments() {
         })
       } catch (error) {
         console.error("Upload error:", error)
+        setError(error instanceof Error ? error.message : "Upload failed")
         setUploadingFiles((prev) => {
           const newMap = new Map(prev)
           newMap.delete(fileId)
@@ -108,15 +134,20 @@ export default function UploadDocuments() {
 
   const removeDocument = async (id: string) => {
     try {
-      const response = await fetch(`/api/documents?id=${id}`, {
+      setError(null)
+      const response = await makeAuthenticatedRequest(`/api/documents?id=${id}`, {
         method: "DELETE",
       })
 
       if (response.ok) {
         setDocuments((prev) => prev.filter((doc) => doc.id !== id))
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to delete document")
       }
     } catch (error) {
       console.error("Error deleting document:", error)
+      setError("Failed to delete document")
     }
   }
 
@@ -147,6 +178,13 @@ export default function UploadDocuments() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-md flex items-center">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Upload Documents</CardTitle>
@@ -164,7 +202,14 @@ export default function UploadDocuments() {
             <Upload className="h-10 w-10 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">Drag and drop files here</h3>
             <p className="text-gray-500 mb-4">or click to browse from your computer</p>
-            <input type="file" id="file-upload" className="hidden" multiple onChange={handleFileInput} />
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              multiple
+              onChange={handleFileInput}
+              accept=".pdf,.docx,.txt"
+            />
             <Button asChild variant="outline">
               <label htmlFor="file-upload" className="cursor-pointer">
                 Browse Files
@@ -176,7 +221,7 @@ export default function UploadDocuments() {
           {/* Show uploading files */}
           {uploadingFiles.size > 0 && (
             <div className="mt-4 space-y-2">
-              {Array.from(uploadingFiles.entries()).map(([fileId, progress]) => (
+              {Array.from(uploadingFiles.keys()).map((fileId) => (
                 <div key={fileId} className="flex items-center p-3 border rounded-md bg-blue-50">
                   <File className="h-5 w-5 text-blue-500 mr-3" />
                   <div className="flex-1">
