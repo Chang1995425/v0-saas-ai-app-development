@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Sparkles, AlertCircle } from "lucide-react"
+import { Loader2, Sparkles, AlertCircle, TestTube } from "lucide-react"
 import JobDescriptionAnalysis from "@/components/proposal/job-description-analysis"
 import ProposalPreview from "@/components/proposal/proposal-preview"
 import { makeAuthenticatedRequest } from "@/lib/api-client"
@@ -31,6 +31,27 @@ export default function NewProposal() {
   const [analysis, setAnalysis] = useState<JobAnalysis | null>(null)
   const [generatedProposal, setGeneratedProposal] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [isTesting, setIsTesting] = useState(false)
+
+  const testOpenAI = async () => {
+    setIsTesting(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/test-openai")
+      const data = await response.json()
+
+      if (response.ok) {
+        setError(`✅ OpenAI Test Successful: ${data.response}`)
+      } else {
+        setError(`❌ OpenAI Test Failed: ${data.error} - ${data.details || ""}`)
+      }
+    } catch (err) {
+      setError(`❌ Test Error: ${err instanceof Error ? err.message : "Unknown error"}`)
+    } finally {
+      setIsTesting(false)
+    }
+  }
 
   const handleAnalyze = async () => {
     if (!jobDescription.trim()) return
@@ -50,7 +71,7 @@ export default function NewProposal() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to analyze job description")
+        throw new Error(data.error || `HTTP ${response.status}: ${data.details || "Failed to analyze job description"}`)
       }
 
       setAnalysis(data)
@@ -83,7 +104,7 @@ export default function NewProposal() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to generate proposal")
+        throw new Error(data.error || `HTTP ${response.status}: ${data.details || "Failed to generate proposal"}`)
       }
 
       setGeneratedProposal(data.proposal)
@@ -103,12 +124,29 @@ export default function NewProposal() {
           <h1 className="text-3xl font-bold">Create New Proposal</h1>
           <p className="text-gray-500">Generate a tailored proposal based on job description</p>
         </div>
+        <Button onClick={testOpenAI} disabled={isTesting} variant="outline">
+          {isTesting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Testing...
+            </>
+          ) : (
+            <>
+              <TestTube className="mr-2 h-4 w-4" />
+              Test OpenAI
+            </>
+          )}
+        </Button>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center">
-          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-          <p className="text-red-600">{error}</p>
+        <div
+          className={`mb-6 p-4 border rounded-md flex items-center ${
+            error.startsWith("✅") ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+          }`}
+        >
+          <AlertCircle className={`h-5 w-5 mr-2 ${error.startsWith("✅") ? "text-green-500" : "text-red-500"}`} />
+          <p className={error.startsWith("✅") ? "text-green-600" : "text-red-600"}>{error}</p>
         </div>
       )}
 
@@ -195,6 +233,7 @@ export default function NewProposal() {
             <div className="h-full flex items-center justify-center border rounded-lg p-8 bg-gray-50">
               <div className="text-center">
                 <p className="text-gray-500">Paste a job description and click "Analyze" to get started</p>
+                <p className="text-sm text-gray-400 mt-2">Or click "Test OpenAI" to verify the AI integration</p>
               </div>
             </div>
           ) : (
