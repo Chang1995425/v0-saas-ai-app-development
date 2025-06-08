@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,7 +17,32 @@ export default function Login() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const router = useRouter()
+  const supabase = createClientSupabase()
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          // User is already logged in, redirect to dashboard
+          router.push("/dashboard")
+          return
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+
+    checkAuth()
+  }, [supabase.auth, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,7 +50,6 @@ export default function Login() {
     setError(null)
 
     try {
-      const supabase = createClientSupabase()
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -35,13 +59,25 @@ export default function Login() {
         throw error
       }
 
+      // Redirect will be handled by auth state change
       router.push("/dashboard")
-      router.refresh()
     } catch (err: any) {
       setError(err.message || "Failed to sign in")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show loading while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">Checking authentication...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

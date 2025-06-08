@@ -24,11 +24,17 @@ export default function Navbar() {
   useEffect(() => {
     // Get initial session
     const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setLoading(false)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
+      } catch (error) {
+        console.error("Error getting session:", error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     }
 
     getSession()
@@ -36,18 +42,52 @@ export default function Navbar() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Navbar - Auth state changed:", event, session?.user?.email)
+
       setUser(session?.user ?? null)
       setLoading(false)
+
+      // Handle sign out event
+      if (event === "SIGNED_OUT") {
+        setUser(null)
+        // Force redirect to home page and clear any cached data
+        window.location.href = "/"
+      }
+
+      // Handle sign in event
+      if (event === "SIGNED_IN" && session?.user) {
+        // Only redirect to dashboard if currently on auth pages
+        if (window.location.pathname.startsWith("/auth/")) {
+          router.push("/dashboard")
+        }
+      }
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, [supabase.auth, router])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
+    try {
+      console.log("Starting sign out process...")
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        console.error("Sign out error:", error)
+      }
+
+      // Clear local state immediately
+      setUser(null)
+
+      // Force a complete page reload to clear all state and redirect to home
+      window.location.href = "/"
+    } catch (err) {
+      console.error("Unexpected sign out error:", err)
+      // Force redirect even if there's an error
+      window.location.href = "/"
+    }
   }
 
   const handleMyAccount = () => {
