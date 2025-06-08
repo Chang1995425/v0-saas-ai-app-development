@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
+import { createServerSupabase } from "@/lib/supabase"
 
 export async function POST(req: Request) {
   try {
@@ -9,6 +10,32 @@ export async function POST(req: Request) {
     if (!jobDescription || jobDescription.trim() === "") {
       return NextResponse.json({ error: "Job description is required" }, { status: 400 })
     }
+
+    const supabase = createServerSupabase()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Get user's profile for general instructions
+    const { data: profile } = await supabase.from("profiles").select("general_instructions").eq("id", user.id).single()
+
+    // Get user's uploaded documents to learn their style
+    const { data: documents } = await supabase
+      .from("documents")
+      .select("file_url, name")
+      .eq("user_id", user.id)
+      .limit(3)
+
+    const generalInstructions = profile?.general_instructions || ""
+    const documentContext = documents?.length
+      ? `The user has uploaded ${documents.length} document(s) including: ${documents.map((d) => d.name).join(", ")}. Use these as reference for writing style.`
+      : ""
 
     // Generate the proposal
     const { text } = await generateText({
@@ -28,7 +55,13 @@ export async function POST(req: Request) {
         - Industry: ${analysis.industry}
         - Business Type: ${analysis.businessType}
         
-        Custom Instructions:
+        User's General Instructions (apply to all proposals):
+        ${generalInstructions}
+        
+        Document Context:
+        ${documentContext}
+        
+        Custom Instructions (specific to this proposal):
         ${customInstructions || "None"}
         
         Create a professional proposal that:
@@ -40,6 +73,7 @@ export async function POST(req: Request) {
         6. Ends with a call to action
         7. Uses the strong words and metrics identified in the analysis naturally throughout
         8. Shows understanding of their industry and business type
+        9. Follows the user's general instructions and writing style preferences
         
         Keep the proposal professional, concise, and compelling. Format it with proper paragraphs and structure.
       `,

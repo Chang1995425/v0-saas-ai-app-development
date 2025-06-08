@@ -1,12 +1,77 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Clock } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { FileText, Clock, Loader2, Save } from "lucide-react"
 import Link from "next/link"
 import RecentProposals from "@/components/dashboard/recent-proposals"
 import UploadDocuments from "@/components/dashboard/upload-documents"
 
+interface Profile {
+  id: string
+  email: string
+  name: string
+  general_instructions: string
+}
+
 export default function Dashboard() {
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState("")
+  const [generalInstructions, setGeneralInstructions] = useState("")
+
+  useEffect(() => {
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch("/api/profile")
+      if (response.ok) {
+        const profileData = await response.json()
+        setProfile(profileData)
+        setName(profileData.name || "")
+        setGeneralInstructions(profileData.general_instructions || "")
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    setSaving(true)
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          general_instructions: generalInstructions,
+        }),
+      })
+
+      if (response.ok) {
+        const updatedProfile = await response.json()
+        setProfile(updatedProfile)
+        // You could add a toast notification here
+      }
+    } catch (error) {
+      console.error("Error saving profile:", error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -86,25 +151,68 @@ export default function Dashboard() {
               <CardTitle>Profile Settings</CardTitle>
               <CardDescription>Manage your account settings and preferences</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">General Instructions</h3>
-                <p className="text-sm text-gray-500">
-                  These instructions will be applied to all your generated proposals
-                </p>
-                <textarea
-                  className="w-full min-h-[150px] p-3 border rounded-md"
-                  placeholder="Example: I'm a senior WordPress developer with 10 years of experience. Keep proposals concise and highlight my technical expertise."
-                />
-              </div>
+            <CardContent className="space-y-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  Loading profile...
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Enter your full name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" value={profile?.email || ""} disabled className="bg-gray-50" />
+                      <p className="text-xs text-gray-500">Email cannot be changed</p>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Subscription</h3>
-                <p className="text-sm">
-                  Current Plan: <span className="font-medium">Pro</span>
-                </p>
-                <Button variant="outline">Manage Subscription</Button>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="general-instructions">General Instructions</Label>
+                    <Textarea
+                      id="general-instructions"
+                      value={generalInstructions}
+                      onChange={(e) => setGeneralInstructions(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Example: I'm a senior WordPress developer with 10 years of experience. Keep proposals concise and highlight my technical expertise. Always mention my portfolio at example.com."
+                    />
+                    <p className="text-sm text-gray-500">
+                      These instructions will be applied to all your generated proposals
+                    </p>
+                  </div>
+
+                  <Button onClick={handleSaveProfile} disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-2">Subscription</h3>
+                    <p className="text-sm mb-4">
+                      Current Plan: <span className="font-medium">Pro</span>
+                    </p>
+                    <Button variant="outline">Manage Subscription</Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

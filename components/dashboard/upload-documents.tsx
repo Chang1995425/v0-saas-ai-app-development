@@ -1,30 +1,44 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Upload, File, X, Check } from "lucide-react"
+import { Upload, File, X, Check, Loader2 } from "lucide-react"
 
 type UploadStatus = "idle" | "uploading" | "success" | "error"
 
-interface UploadedFile {
+interface Document {
   id: string
   name: string
-  size: number
-  status: UploadStatus
-  progress?: number
+  file_size: number
+  file_type: string
+  created_at: string
 }
 
 export default function UploadDocuments() {
-  const [files, setFiles] = useState<UploadedFile[]>([
-    { id: "file-1", name: "Agency Proposal Template.docx", size: 245000, status: "success" },
-    { id: "file-2", name: "E-commerce Project Proposal.pdf", size: 1200000, status: "success" },
-    { id: "file-3", name: "Web Development Proposal.pdf", size: 890000, status: "success" },
-  ])
-
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState<Map<string, number>>(new Map())
   const [isDragging, setIsDragging] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await fetch("/api/documents")
+      if (response.ok) {
+        const docs = await response.json()
+        setDocuments(docs)
+      }
+    } catch (error) {
+      console.error("Error fetching documents:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -50,48 +64,85 @@ export default function UploadDocuments() {
     }
   }
 
-  const handleFiles = (newFiles: File[]) => {
-    const newUploadedFiles = newFiles.map((file) => ({
-      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: file.name,
-      size: file.size,
-      status: "uploading" as UploadStatus,
-      progress: 0,
-    }))
+  const handleFiles = async (files: File[]) => {
+    for (const file of files) {
+      const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-    setFiles((prev) => [...prev, ...newUploadedFiles])
+      // Add to uploading files
+      setUploadingFiles((prev) => new Map(prev.set(fileId, 0)))
 
-    // Simulate upload progress
-    newUploadedFiles.forEach((file) => {
-      const interval = setInterval(() => {
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === file.id
-              ? {
-                  ...f,
-                  progress: f.progress !== undefined ? Math.min(f.progress + 10, 100) : 10,
-                }
-              : f,
-          ),
-        )
-      }, 300)
+      try {
+        const formData = new FormData()
+        formData.append("file", file)
 
-      // Simulate completion after 3 seconds
-      setTimeout(() => {
-        clearInterval(interval)
-        setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, status: "success", progress: 100 } : f)))
-      }, 3000)
-    })
+        const response = await fetch("/api/documents", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!response.ok) {
+          throw new Error("Upload failed")
+        }
+
+        const newDocument = await response.json()
+
+        // Add to documents list
+        setDocuments((prev) => [newDocument, ...prev])
+
+        // Remove from uploading
+        setUploadingFiles((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(fileId)
+          return newMap
+        })
+      } catch (error) {
+        console.error("Upload error:", error)
+        setUploadingFiles((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(fileId)
+          return newMap
+        })
+      }
+    }
   }
 
-  const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((file) => file.id !== id))
+  const removeDocument = async (id: string) => {
+    try {
+      const response = await fetch(`/api/documents?id=${id}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        setDocuments((prev) => prev.filter((doc) => doc.id !== id))
+      }
+    } catch (error) {
+      console.error("Error deleting document:", error)
+    }
   }
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B"
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB"
     else return (bytes / 1048576).toFixed(1) + " MB"
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="ml-2">Loading documents...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -121,44 +172,51 @@ export default function UploadDocuments() {
             </Button>
             <p className="text-xs text-gray-500 mt-4">Supported formats: PDF, DOCX, TXT (Max 10MB)</p>
           </div>
+
+          {/* Show uploading files */}
+          {uploadingFiles.size > 0 && (
+            <div className="mt-4 space-y-2">
+              {Array.from(uploadingFiles.entries()).map(([fileId, progress]) => (
+                <div key={fileId} className="flex items-center p-3 border rounded-md bg-blue-50">
+                  <File className="h-5 w-5 text-blue-500 mr-3" />
+                  <div className="flex-1">
+                    <p className="font-medium">Uploading...</p>
+                    <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: "50%" }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Your Documents</CardTitle>
+          <CardTitle>Your Documents ({documents.length})</CardTitle>
           <CardDescription>Manage your uploaded documents</CardDescription>
         </CardHeader>
         <CardContent>
-          {files.length === 0 ? (
+          {documents.length === 0 ? (
             <p className="text-center text-gray-500 py-8">No documents uploaded yet</p>
           ) : (
             <ul className="space-y-3">
-              {files.map((file) => (
-                <li key={file.id} className="flex items-center justify-between p-3 border rounded-md">
+              {documents.map((document) => (
+                <li key={document.id} className="flex items-center justify-between p-3 border rounded-md">
                   <div className="flex items-center">
                     <File className="h-5 w-5 text-gray-400 mr-3" />
                     <div>
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                      <p className="font-medium">{document.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {formatFileSize(document.file_size)} • {formatDate(document.created_at)}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-center">
-                    {file.status === "uploading" && (
-                      <div className="mr-4 w-24">
-                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-purple-600 rounded-full" style={{ width: `${file.progress}%` }} />
-                        </div>
-                        <p className="text-xs text-gray-500 text-right mt-1">{file.progress}%</p>
-                      </div>
-                    )}
-
-                    {file.status === "success" && <Check className="h-5 w-5 text-green-500 mr-4" />}
-
-                    {file.status === "error" && <p className="text-xs text-red-500 mr-4">Failed</p>}
-
-                    <Button size="icon" variant="ghost" onClick={() => removeFile(file.id)}>
+                    <Check className="h-5 w-5 text-green-500 mr-4" />
+                    <Button size="icon" variant="ghost" onClick={() => removeDocument(document.id)}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
