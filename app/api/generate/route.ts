@@ -19,7 +19,6 @@ export async function POST(req: Request) {
 
     // Get user information from auth header
     const authHeader = req.headers.get("Authorization")
-    let userId = null
     let generalInstructions = ""
     let documentContext = ""
 
@@ -27,19 +26,14 @@ export async function POST(req: Request) {
       try {
         const supabase = createClientSupabase()
 
-        // Set the auth header for this request
-        supabase.auth.setSession({
-          access_token: authHeader.replace("Bearer ", ""),
-          refresh_token: "",
-        })
+        // Extract token from header
+        const token = authHeader.replace("Bearer ", "")
 
         const {
           data: { user },
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser(token)
 
         if (user) {
-          userId = user.id
-
           // Get user's profile for general instructions
           const { data: profile } = await supabase
             .from("profiles")

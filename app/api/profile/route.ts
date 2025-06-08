@@ -12,16 +12,14 @@ export async function GET(request: Request) {
 
     const supabase = createClientSupabase()
 
-    // Set the auth header for this request
-    supabase.auth.setSession({
-      access_token: authHeader.replace("Bearer ", ""),
-      refresh_token: "",
-    })
+    // Extract token from header
+    const token = authHeader.replace("Bearer ", "")
 
+    // Set the auth token for this request
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -30,25 +28,6 @@ export async function GET(request: Request) {
     const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
     if (error && error.code !== "PGRST116") {
-      // If no profile exists, create one
-      if (error.code === "PGRST116") {
-        const { data: newProfile, error: insertError } = await supabase
-          .from("profiles")
-          .insert({
-            id: user.id,
-            email: user.email,
-            name: user.user_metadata?.name || "",
-            general_instructions: "",
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          throw insertError
-        }
-
-        return NextResponse.json(newProfile)
-      }
       throw error
     }
 
@@ -89,16 +68,14 @@ export async function PUT(request: Request) {
 
     const supabase = createClientSupabase()
 
-    // Set the auth header for this request
-    supabase.auth.setSession({
-      access_token: authHeader.replace("Bearer ", ""),
-      refresh_token: "",
-    })
+    // Extract token from header
+    const token = authHeader.replace("Bearer ", "")
 
+    // Set the auth token for this request
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

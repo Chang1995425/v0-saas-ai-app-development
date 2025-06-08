@@ -11,16 +11,13 @@ export async function GET(request: Request) {
 
     const supabase = createClientSupabase()
 
-    // Set the auth header for this request
-    supabase.auth.setSession({
-      access_token: authHeader.replace("Bearer ", ""),
-      refresh_token: "",
-    })
+    // Extract token from header
+    const token = authHeader.replace("Bearer ", "")
 
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -53,16 +50,13 @@ export async function POST(request: Request) {
 
     const supabase = createClientSupabase()
 
-    // Set the auth header for this request
-    supabase.auth.setSession({
-      access_token: authHeader.replace("Bearer ", ""),
-      refresh_token: "",
-    })
+    // Extract token from header
+    const token = authHeader.replace("Bearer ", "")
 
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -144,16 +138,13 @@ export async function DELETE(request: Request) {
 
     const supabase = createClientSupabase()
 
-    // Set the auth header for this request
-    supabase.auth.setSession({
-      access_token: authHeader.replace("Bearer ", ""),
-      refresh_token: "",
-    })
+    // Extract token from header
+    const token = authHeader.replace("Bearer ", "")
 
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
