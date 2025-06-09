@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-export async function GET() {
+export const GET = async () => {
   try {
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
@@ -36,6 +36,8 @@ export async function GET() {
           max_tokens: 50,
           temperature: 0.1,
         }),
+        // Add timeout to prevent hanging requests
+        signal: AbortSignal.timeout(10000),
       })
 
       const data = await response.json()
@@ -54,40 +56,12 @@ export async function GET() {
         )
       }
 
-      // Now test with AI SDK
-      try {
-        const { generateText } = await import("ai")
-        const { openai } = await import("@ai-sdk/openai")
-
-        const { text } = await generateText({
-          model: openai("gpt-3.5-turbo"),
-          prompt: 'Say \'Hello, AI SDK is working!\' in JSON format: {"message": "your response"}',
-          temperature: 0.1,
-          maxTokens: 50,
-        })
-
-        return NextResponse.json({
-          success: true,
-          configured: true,
-          directApiResponse: data.choices[0]?.message?.content || "No content",
-          aiSdkResponse: text,
-          apiKeyPrefix: apiKey.substring(0, 7) + "...",
-        })
-      } catch (aiSdkError: any) {
-        console.error("AI SDK error:", aiSdkError)
-        return NextResponse.json(
-          {
-            error: "AI SDK error",
-            details: aiSdkError.message,
-            stack: aiSdkError.stack,
-            directApiWorked: true,
-            directApiResponse: data.choices[0]?.message?.content || "No content",
-            configured: true,
-            apiKeyPrefix: apiKey.substring(0, 7) + "...",
-          },
-          { status: 500 },
-        )
-      }
+      return NextResponse.json({
+        success: true,
+        configured: true,
+        response: data.choices[0]?.message?.content || "No content",
+        apiKeyPrefix: apiKey.substring(0, 7) + "...",
+      })
     } catch (directError: any) {
       console.error("Direct API error:", directError)
       return NextResponse.json(

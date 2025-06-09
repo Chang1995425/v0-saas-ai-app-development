@@ -48,19 +48,17 @@ export default function Navbar() {
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // Handle sign out event
+      // Handle sign out event - redirect to homepage
       if (event === "SIGNED_OUT") {
         setUser(null)
-        // Force redirect to home page and clear any cached data
+        // Force redirect to homepage
         window.location.href = "/"
       }
 
-      // Handle sign in event
+      // Handle sign in event - redirect to dashboard
       if (event === "SIGNED_IN" && session?.user) {
-        // Only redirect to dashboard if currently on auth pages
-        if (window.location.pathname.startsWith("/auth/")) {
-          router.push("/dashboard")
-        }
+        // Redirect to dashboard after successful login
+        window.location.href = "/dashboard"
       }
     })
 
@@ -81,11 +79,11 @@ export default function Navbar() {
       // Clear local state immediately
       setUser(null)
 
-      // Force a complete page reload to clear all state and redirect to home
+      // Force redirect to homepage (root path)
       window.location.href = "/"
     } catch (err) {
       console.error("Unexpected sign out error:", err)
-      // Force redirect even if there's an error
+      // Force redirect to homepage even if there's an error
       window.location.href = "/"
     }
   }

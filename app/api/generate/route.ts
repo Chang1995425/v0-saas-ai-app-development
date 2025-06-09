@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClientSupabase } from "@/lib/supabase"
+import { withErrorHandling } from "@/lib/error-handling"
 
-export async function POST(req: Request) {
+export const POST = withErrorHandling(async (req: Request) => {
   try {
     const { jobDescription, analysis, customInstructions, jobTitle } = await req.json()
 
@@ -156,4 +157,4 @@ export async function POST(req: Request) {
       { status: 500 },
     )
   }
-}
+})

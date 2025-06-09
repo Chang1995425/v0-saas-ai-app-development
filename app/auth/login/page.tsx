@@ -31,7 +31,7 @@ export default function Login() {
 
         if (session?.user) {
           // User is already logged in, redirect to dashboard
-          router.push("/dashboard")
+          window.location.href = "/dashboard"
           return
         }
       } catch (error) {
@@ -42,7 +42,7 @@ export default function Login() {
     }
 
     checkAuth()
-  }, [supabase.auth, router])
+  }, [supabase.auth])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,8 +59,8 @@ export default function Login() {
         throw error
       }
 
-      // Redirect will be handled by auth state change
-      router.push("/dashboard")
+      // Force redirect to dashboard after successful login
+      window.location.href = "/dashboard"
     } catch (err: any) {
       setError(err.message || "Failed to sign in")
     } finally {

@@ -48,6 +48,9 @@ export default function Signup() {
       }
 
       setMessage("Check your email for the confirmation link!")
+
+      // If email confirmation is disabled, redirect to dashboard
+      // Otherwise, user will be redirected after email confirmation
     } catch (err: any) {
       setError(err.message || "Failed to sign up")
     } finally {
